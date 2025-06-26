@@ -21,6 +21,7 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # Build and Release Folders
+bin/
 bin-debug/
 bin-release/
 
@@ -30,3 +31,4 @@ bin-release/
 .settings/
 .project
 *.fla
+*.iml
