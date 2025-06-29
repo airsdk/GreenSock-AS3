@@ -1,6 +1,13 @@
 CHANGE LOG : GREENSOCK TWEENING PLATFORM
 ----------------------------------------
 
+2025-06-30
+---------------------------------------------
+v12.2.0
+	- Added DataStreamLoader and FileStreamLoader to use a URLStream to progressively download data from a URL
+	- AIR Package release for apm
+	- Add asdocs to version control
+
 2012-11-26
 ---------------------------------------------
 	- Removed requirement that the target of a Physics2DPlugin tween be a DisplayObject (so Starling can work)

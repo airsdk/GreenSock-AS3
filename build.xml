@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="build" name="lib" xmlns:if="ant:if" xmlns:unless="ant:unless">
+    <taskdef resource="net/sf/antcontrib/antlib.xml"/>
+    <target name="bootstrap">
+        <mkdir dir="${user.home}/.ant/lib"/>
+        <get dest="${user.home}/.ant/lib/ant-contrib.jar" src="https://search.maven.org/remotecontent?filepath=ant-contrib/ant-contrib/1.0b3/ant-contrib-1.0b3.jar"/>
+    </target>
+
+    <!-- ENVIRONMENT -->
+    <dirname property="project.basedir" file="${ant.file.lib}"/>
+    <property environment="env."/>
+    <property name="AIR_SDK_HOME" value="${env.AIR_HOME}"/>
+    <property name="FLEX_HOME" value="${env.FLEX_HOME}"/>
+    <taskdef resource="flexTasks.tasks" classpath="${AIR_SDK_HOME}/ant/lib/flexTasks.jar"/>
+    <condition property="air.apm" value="apm.bat" else="apm">
+        <os family="windows"/>
+    </condition>
+    <condition property="air.asdoc" value="${AIR_SDK_HOME}/bin/asdoc.bat" else="${AIR_SDK_HOME}/bin/asdoc">
+        <os family="windows"/>
+	</condition>
+
+    <!-- CONFIG -->
+    <property file="${project.basedir}/build.properties" description="build properties"/>
+    <property name="version.properties" value="${project.basedir}/version.properties"/>
+    <property name="project.builddir" value="${project.basedir}/${output.build}"/>
+
+    <!-- VERSIONING -->
+    <target name="version">
+        <propertyfile file="${version.properties}">
+            <entry key="version_build" type="int" operation="+" value="1"/>
+        </propertyfile>
+    </target>
+
+    <!-- CLEAN -->
+    <target name="clean">
+        <delete dir="${project.builddir}"/>
+    </target>
+
+    <!-- BUILD -->
+    <target name="build">
+        <property file="${version.properties}"/>
+        <var name="version" value="${version_major}.${version_minor}.${version_build}"/>
+        <echo message="Building ${project.name} v${version}"/>
+        <compc output="${project.builddir}/${project.id}.swc" debug="false" optimize="true">
+            <load-config filename="${FLEX_HOME}/frameworks/air-config.xml"/>
+            <compiler.define name="CONFIG::DEBUG" value="false"/>
+            <compiler.define name="CONFIG::VERSION" value="'${version}'"/>
+            <source-path path-element="${project.basedir}/${project.src}"/>
+            <include-sources dir="${project.basedir}/${project.src}" includes="*"/>
+        </compc>
+    </target>
+
+    <!-- DOCS -->
+    <target name="docs">
+        <delete dir="${project.basedir}/${output.docs}" />
+        <mkdir dir="${project.basedir}/${output.docs}" />
+        <exec executable="${air.asdoc}" failonerror="true">
+            <arg line="-compiler.locale en_US" />
+            <arg line="-source-path ${project.basedir}/${project.src}" />
+            <arg line="-window-title 'GreenSock ActionScript API Docs'" />
+            <arg line="-main-title 'GreenSock ActionScript API Docs'" />
+            <arg line="-doc-sources ${project.basedir}/${project.src}" />
+            <arg line="-output ${project.basedir}/${output.docs}" />
+            <arg line="-lenient" />
+            <arg line="-library-path+='${AIR_SDK_HOME}/frameworks/libs/air/airglobal.swc'" />
+        </exec>
+    </target>
+
+    <!-- AIR PACKAGE -->
+    <target name="airpackage" depends="airpackage_build">
+        <property file="${version.properties}"/>
+        <var name="version" value="${version_major}.${version_minor}.${version_build}"/>
+        <var name="airpackage.dir" value="${project.builddir}/package"/>
+        <property name="packagefile" value="${project.id}_${version}.airpackage"/>
+        <echo message="Deploying to ${github.repo} ${version} ${packagefile}"/>
+        <exec executable="gh" failonerror="false">
+            <arg line="-R ${github.repo} release create ${version} --title ${version} --notes 'Release v${version}'"/>
+        </exec>
+        <!-- Upload to github release -->
+        <exec executable="gh" failonerror="true">
+            <arg line="-R ${github.repo} release upload ${version}"/>
+            <arg line="${airpackage.dir}/${packagefile}"/>
+            <arg line="--clobber"/>
+        </exec>
+        <!-- Publish to apm repository -->
+        <exec executable="${air.apm}" dir="${airpackage.dir}">
+            <arg line="publish ${packagefile}"/>
+        </exec>
+    </target>
+
+    <target name="airpackage_build" depends="build">
+        <property file="${version.properties}"/>
+        <var name="version" value="${version_major}.${version_minor}.${version_build}"/>
+        <tstamp>
+            <format property="publish_date_time" pattern="yyyy-MM-dd'T'HH:mm:ss.000'Z'" locale="en,UK"/>
+        </tstamp>
+        <var name="airpackage.dir" value="${project.builddir}/package"/>
+        <var name="airpackage.build" value="${airpackage.dir}/${output.build}"/>
+
+        <mkdir dir="${airpackage.dir}"/>
+        <mkdir dir="${airpackage.build}"/>
+        <mkdir dir="${airpackage.build}/swc"/>
+        <copy file="${project.builddir}/${project.id}.swc" todir="${airpackage.build}/swc"/>
+        <copy file="${project.basedir}/README.md" tofile="${airpackage.build}/README.md" overwrite="true" />
+        <copy file="${project.basedir}/LICENSE.md" tofile="${airpackage.build}/LICENSE.md" overwrite="true" failonerror="false"/>
+        <copy file="${project.basedir}/CHANGELOG.md" tofile="${airpackage.build}/CHANGELOG.md" overwrite="true" failonerror="false"/>
+        <copy file="${project.basedir}/package.json" tofile="${airpackage.build}/package.json" overwrite="true">
+            <filterchain>
+                <replacetokens>
+                    <token key="ID" value="${project.id}"/>
+                    <token key="NAME" value="${project.name}"/>
+                    <token key="DESCRIPTION" value="${project.description}"/>
+                    <token key="DATETIME" value="${publish_date_time}"/>
+                    <token key="VERSION" value="${version}"/>
+                    <token key="GITHUB_REPO" value="${github.repo}"/>
+                </replacetokens>
+            </filterchain>
+        </copy>
+        <exec executable="${air.apm}" dir="${airpackage.dir}">
+            <arg line="build ${output.build}"/>
+        </exec>
+
+        <delete dir="${airpackage.build}" />
+    </target>
+
+
+</project>
